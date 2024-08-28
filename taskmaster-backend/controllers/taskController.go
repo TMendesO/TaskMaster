@@ -112,9 +112,54 @@ func UpdateTaskStatus(c *gin.Context) {
 }
 
 func GetStats(c *gin.Context) {
-	data := map[string]interface{}{
-		"labels": []string{"Jan", "Feb", "Mar", "Apr"},
-		"values": []int{5, 10, 15, 20},
+	var stats []struct {
+		Month     string
+		Status    string
+		TaskCount int
 	}
+
+	models.DB.Raw(`
+		SELECT 
+			TO_CHAR(DATE_TRUNC('month', updated_at), 'Mon') AS month, 
+			status,
+			COUNT(*) AS task_count
+		FROM tasks 
+		WHERE updated_at > NOW() - INTERVAL '1 year'
+			AND deleted_at IS NULL  
+		GROUP BY DATE_TRUNC('month', updated_at), status
+		ORDER BY DATE_TRUNC('month', updated_at), status
+	`).Scan(&stats)
+
+	data := map[string]interface{}{
+		"months":    []string{},
+		"open":      []int{},
+		"pending":   []int{},
+		"completed": []int{},
+	}
+
+	for _, stat := range stats {
+		data["months"] = appendIfMissing(data["months"].([]string), stat.Month)
+
+		switch stat.Status {
+		case "Aberto":
+			data["open"] = append(data["open"].([]int), stat.TaskCount)
+		case "Pendente":
+			data["pending"] = append(data["pending"].([]int), stat.TaskCount)
+		case "Completo":
+			data["completed"] = append(data["completed"].([]int), stat.TaskCount)
+		}
+
+	}
+
 	c.JSON(http.StatusOK, data)
+
+}
+
+func appendIfMissing(slice []string, s string) []string {
+	for _, v := range slice {
+		if v == s {
+			return slice
+		}
+	}
+	return append(slice, s)
 }

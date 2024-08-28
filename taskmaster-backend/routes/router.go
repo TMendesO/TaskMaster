@@ -20,6 +20,7 @@ func SetupRouter() *gin.Engine {
 	// Rotas públicas
 	router.POST("/auth/register", controllers.Register)
 	router.POST("/auth/login", controllers.Login)
+	router.GET("/stats", controllers.GetStats)
 
 	// Rotas protegidas
 	auth := router.Group("/")
@@ -27,7 +28,6 @@ func SetupRouter() *gin.Engine {
 	{
 		auth.GET("/tasks", controllers.GetTasks)
 		auth.GET("/tasks/:id", controllers.GetTask)
-		auth.GET("/stats", controllers.GetStats)
 		auth.POST("/tasks", controllers.CreateTask)
 		auth.PUT("/tasks/:id", controllers.UpdateTask)
 		auth.PUT("/tasks/:id/status", controllers.UpdateTaskStatus)
