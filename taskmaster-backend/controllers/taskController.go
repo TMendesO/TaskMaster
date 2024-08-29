@@ -3,9 +3,61 @@ package controllers
 import (
 	"net/http"
 
+	"sync"
+
 	"github.com/TMendesO/taskmaster-backend/models"
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 )
+
+var wsUpgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
+}
+
+var clients = make(map[*websocket.Conn]bool)
+var broadcast = make(chan interface{})
+var mutex = &sync.Mutex{}
+
+func WebSocketHandler(c *gin.Context) {
+	ws, err := wsUpgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to set WebSocket upgrade"})
+		return
+	}
+	defer ws.Close()
+
+	mutex.Lock()
+	clients[ws] = true
+	mutex.Unlock()
+
+	for {
+		var msg interface{}
+		err := ws.ReadJSON(&msg)
+		if err != nil {
+			mutex.Lock()
+			delete(clients, ws)
+			mutex.Unlock()
+			break
+		}
+	}
+}
+
+func HandleMessages() {
+	for {
+		msg := <-broadcast
+		mutex.Lock()
+		for client := range clients {
+			err := client.WriteJSON(msg)
+			if err != nil {
+				client.Close()
+				delete(clients, client)
+			}
+		}
+		mutex.Unlock()
+	}
+}
 
 func GetTask(c *gin.Context) {
 	var task models.Task
@@ -15,12 +67,14 @@ func GetTask(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
 		return
 	}
+	broadcast <- gin.H{"action": "create", "task": task}
 	c.JSON(http.StatusOK, task)
 }
 
 func GetTasks(c *gin.Context) {
 	var tasks []models.Task
 	models.DB.Find(&tasks)
+	broadcast <- gin.H{"action": "create", "task": tasks}
 	c.JSON(http.StatusOK, tasks)
 }
 
@@ -39,13 +93,13 @@ func CreateTask(c *gin.Context) {
 	}
 
 	task.UserID = user.(models.User).ID
-	task.Status = "Aberto" // Inicializa a tarefa com status "Aberto"
+	task.Status = "Aberto"
 
 	if err := models.DB.Create(&task).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
+	broadcast <- gin.H{"action": "create", "task": task}
 	c.JSON(http.StatusOK, task)
 }
 
@@ -69,6 +123,7 @@ func UpdateTask(c *gin.Context) {
 	}
 
 	models.DB.Save(&task)
+	broadcast <- gin.H{"action": "create", "task": task}
 	c.JSON(http.StatusOK, task)
 }
 
@@ -85,7 +140,7 @@ func DeleteTask(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
+	broadcast <- gin.H{"action": "create", "task": task}
 	c.JSON(http.StatusOK, gin.H{"message": "Task deleted successfully"})
 }
 
@@ -108,6 +163,7 @@ func UpdateTaskStatus(c *gin.Context) {
 
 	task.Status = input.Status
 	models.DB.Save(&task)
+	broadcast <- gin.H{"action": "create", "task": task}
 	c.JSON(http.StatusOK, task)
 }
 

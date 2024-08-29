@@ -23,81 +23,50 @@ ChartJS.register(
 const ProductivityChart = () => {
   const [chartData, setChartData] = useState({ labels: [], datasets: [] });
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const response = await getStats();
-        const data = response.data;
+  const fetchData = async () => {
+    try {
+      const response = await getStats();
+      const data = response.data;
 
-        if (data && data.months) {
-          setChartData({
-            labels: data.months,
-            datasets: [
-              {
-                label: "Aberto",
-                data: data.open,
-                backgroundColor: "rgba(255, 99, 132, 0.6)",
-              },
-              {
-                label: "Pendente",
-                data: data.pending,
-                backgroundColor: "rgba(255, 206, 86, 0.6)",
-              },
-              {
-                label: "Concluído",
-                data: data.completed,
-                backgroundColor: "rgba(75, 192, 192, 0.6)",
-              },
-            ],
-          });
-        } else {
-          setChartData({
-            labels: [],
-            datasets: [
-              {
-                label: "Aberto",
-                data: [],
-                backgroundColor: "rgba(255, 99, 132, 0.6)",
-              },
-              {
-                label: "Pendente",
-                data: [],
-                backgroundColor: "rgba(255, 206, 86, 0.6)",
-              },
-              {
-                label: "Concluído",
-                data: [],
-                backgroundColor: "rgba(75, 192, 192, 0.6)",
-              },
-            ],
-          });
-        }
-      } catch (error) {
-        console.error("Error fetching data", error);
-
-        setChartData({
-          labels: [],
-          datasets: [
-            {
-              label: "Aberto",
-              data: [],
-              backgroundColor: "rgba(255, 99, 132, 0.6)",
-            },
-            {
-              label: "Pendente",
-              data: [],
-              backgroundColor: "rgba(255, 206, 86, 0.6)",
-            },
-            {
-              label: "Concluído",
-              data: [],
-              backgroundColor: "rgba(75, 192, 192, 0.6)",
-            },
-          ],
-        });
-      }
+      setChartData({
+        labels: data.months || [],
+        datasets: [
+          {
+            label: "Aberto",
+            data: data.open || [],
+            backgroundColor: "rgba(255, 99, 132, 0.6)",
+          },
+          {
+            label: "Pendente",
+            data: data.pending || [],
+            backgroundColor: "rgba(255, 206, 86, 0.6)",
+          },
+          {
+            label: "Concluído",
+            data: data.completed || [],
+            backgroundColor: "rgba(75, 192, 192, 0.6)",
+          },
+        ],
+      });
+    } catch (error) {
+      console.error("Error fetching data", error);
     }
+  };
+
+  useEffect(() => {
     fetchData();
+
+    const ws = new WebSocket("ws://localhost:8080/ws");
+
+    ws.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+
+      if (message.action) {
+        fetchData();
+      }
+    };
+
+    return () => ws.close();
   }, []);
 
   return (
