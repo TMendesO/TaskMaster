@@ -99,7 +99,7 @@ TaskMaster é um sistema avançado de gerenciamento de tarefas que oferece uma i
 
 - **Adicionar uma Tarefa**: Utilize o formulário no `TaskForm` para adicionar novas tarefas.
 - **Excluir uma Tarefa**: Clique em "Delete" para remover uma tarefa.
-- **Atualizar Status**: Use o dropdown ao lado de cada tarefa para alterar seu status.
+- **Atualizar Status**: clique e arraste a task para mudar de status.
 
 ## 🤝 Contribuição
 
