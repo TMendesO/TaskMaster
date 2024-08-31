@@ -1,11 +1,27 @@
 import React, { useEffect, useState } from "react";
 import { getTasks, deleteTask, updateTask } from "../services/taskService";
 import TaskForm from "./TaskForm";
-import { Box, Card, CardContent, Typography, Button } from "@mui/material";
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  Button,
+  useMediaQuery,
+  Select,
+  MenuItem,
+  TextField,
+  IconButton,
+} from "@mui/material";
+import EditIcon from "@mui/icons-material/Edit";
+import SaveIcon from "@mui/icons-material/Save";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 
 const TaskList = () => {
   const [tasks, setTasks] = useState([]);
+  const [editTaskId, setEditTaskId] = useState(null);
+  const [editDescription, setEditDescription] = useState("");
+  const isMobile = useMediaQuery("(max-width: 600px)");
 
   const fetchTasks = async () => {
     try {
@@ -50,6 +66,30 @@ const TaskList = () => {
     }
   };
 
+  const handleEditDescription = async (taskId) => {
+    try {
+      const taskToUpdate = tasks.find((task) => task.ID === taskId);
+      if (!taskToUpdate) {
+        console.error("Task not found with ID:", taskId);
+        return;
+      }
+
+      const updatedTask = { ...taskToUpdate, description: editDescription };
+      await updateTask(taskId, updatedTask);
+
+      setTasks((prevTasks) =>
+        prevTasks.map((task) =>
+          task.ID === taskId ? { ...task, description: editDescription } : task
+        )
+      );
+
+      setEditTaskId(null);
+      setEditDescription("");
+    } catch (error) {
+      console.error("Failed to update task description:", error);
+    }
+  };
+
   const handleDragEnd = (result) => {
     const { destination, source, draggableId } = result;
 
@@ -75,7 +115,7 @@ const TaskList = () => {
       .map((task, index) => {
         if (!task.ID) {
           console.error("Task ID is undefined for task:", task);
-          return null; // Skip rendering this task
+          return null;
         }
 
         return (
@@ -98,9 +138,49 @@ const TaskList = () => {
               >
                 <CardContent>
                   <Typography variant="h6">{task.title}</Typography>
-                  <Typography variant="body2" color="textSecondary">
-                    {task.description}
-                  </Typography>
+                  {editTaskId === task.ID ? (
+                    <Box>
+                      <TextField
+                        fullWidth
+                        value={editDescription}
+                        onChange={(e) => setEditDescription(e.target.value)}
+                        multiline
+                        rows={3}
+                        sx={{ marginTop: 1 }}
+                      />
+                      <IconButton
+                        onClick={() => handleEditDescription(task.ID)}
+                        color="primary"
+                      >
+                        <SaveIcon />
+                      </IconButton>
+                    </Box>
+                  ) : (
+                    <Typography variant="body2" color="textSecondary">
+                      {task.description}
+                      <IconButton
+                        onClick={() => {
+                          setEditTaskId(task.ID);
+                          setEditDescription(task.description);
+                        }}
+                        color="primary"
+                      >
+                        <EditIcon />
+                      </IconButton>
+                    </Typography>
+                  )}
+                  <Select
+                    value={task.status}
+                    onChange={(e) =>
+                      handleStatusChange(task.ID, e.target.value)
+                    }
+                    fullWidth
+                    sx={{ marginTop: 2 }}
+                  >
+                    <MenuItem value="Aberto">Aberto</MenuItem>
+                    <MenuItem value="Pendente">Pendente</MenuItem>
+                    <MenuItem value="Completo">Completo</MenuItem>
+                  </Select>
                   <Button
                     variant="contained"
                     color="secondary"
@@ -118,6 +198,10 @@ const TaskList = () => {
       });
   };
 
+  if (!tasks.length) {
+    return <Typography>Loading tasks...</Typography>;
+  }
+
   return (
     <Box>
       <TaskForm setTasks={setTasks} tasks={tasks} />
@@ -125,6 +209,7 @@ const TaskList = () => {
         <Box
           sx={{
             display: "flex",
+            flexDirection: isMobile ? "column" : "row",
             justifyContent: "space-between",
             marginTop: 4,
           }}
@@ -135,7 +220,11 @@ const TaskList = () => {
                 <Box
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  sx={{ flex: 1, marginX: 2 }}
+                  sx={{
+                    flex: 1,
+                    marginX: isMobile ? 0 : 2,
+                    marginBottom: isMobile ? 4 : 0,
+                  }}
                 >
                   <Typography variant="h5" gutterBottom>
                     {status}
